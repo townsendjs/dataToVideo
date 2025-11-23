@@ -4,7 +4,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 import numpy as np
-from moviepy.editor import ImageSequenceClip
+from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -159,10 +159,35 @@ class DataToVideoApp:
             self._convert(path)
 
     def _on_drop(self, event):
-        # event.data may contain braces and spaces; take the first path
-        raw_path = event.data
-        cleaned = raw_path.strip("{}")
-        first_path = cleaned.split(" ")[0]
+        # event.data may contain multiple paths, with braces around those that include spaces.
+        raw_path = event.data.strip()
+
+        paths: list[str] = []
+        current = ""
+        in_brace = False
+
+        for ch in raw_path:
+            if ch == "{":
+                in_brace = True
+                current = ""
+            elif ch == "}":
+                in_brace = False
+                if current:
+                    paths.append(current)
+                    current = ""
+            elif ch == " " and not in_brace:
+                # separator between paths
+                if current:
+                    paths.append(current)
+                    current = ""
+            else:
+                current += ch
+
+        if current:
+            paths.append(current)
+
+        first_path = paths[0] if paths else ""
+
         if first_path:
             path = Path(first_path)
             self.selected_file_path = path
