@@ -3,8 +3,6 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
 
-from glitch_hub import tomato_gui
-
 
 def _ensure_repo_on_path() -> None:
     repo_root = Path(__file__).resolve().parents[1]
@@ -20,10 +18,14 @@ def _launch_data_to_video() -> None:
 
 
 def _launch_tomato(root: tk.Tk) -> None:
+    _ensure_repo_on_path()
+    from glitch_hub import tomato_gui
+
     tomato_gui.show_tomato_gui(parent=root)
 
 
 def main() -> None:
+    _ensure_repo_on_path()
     root = tk.Tk()
     root.title("Glitch Hub")
     root.geometry("360x220")
