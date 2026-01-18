@@ -35,6 +35,12 @@ python glitch_hub/hub.py
 
 This menu lets you choose between the Data → Video GUI or the Tomato AVI datamosh tool. Running `python app.py` still launches the standalone Data → Video GUI.
 
+## Glitch Hub GUI
+Launch the Glitch Hub home screen:
+```bash
+python glitch_hub/gui.py
+```
+
 ## Tweaks
 - The GUI offers aspect ratios and base widths; adjust `BASE_SIZES` or `ASPECT_RATIOS` in `app.py` for different presets.
 - Change `FPS` or the `write_videofile` codec/preset in `app.py` to target other formats (e.g., ProRes) if desired.
