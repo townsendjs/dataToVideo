@@ -59,8 +59,10 @@ def _compute_output_path(file_path: Path, mode: str, countframes: int, positfram
 class TomatoApp:
     def __init__(self, parent: tk.Misc | None = None):
         _ensure_repo_on_path()
-        if parent and DND_AVAILABLE:
+        if parent and DND_AVAILABLE and hasattr(TkinterDnD, "Toplevel"):
             self.root = TkinterDnD.Toplevel(parent)
+        elif parent and DND_AVAILABLE:
+            self.root = TkinterDnD.Tk()
         elif parent:
             self.root = tk.Toplevel(parent)
         else:
