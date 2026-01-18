@@ -19,9 +19,9 @@ def _launch_data_to_video() -> None:
 
 def _launch_tomato(root: tk.Tk) -> None:
     _ensure_repo_on_path()
-    from glitch_hub import tomato_gui
+    from glitch_hub.tomato_gui import TomatoApp
 
-    tomato_gui.show_tomato_gui(parent=root)
+    TomatoApp(parent=root)
 
 
 def main() -> None:
