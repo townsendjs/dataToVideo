@@ -72,6 +72,7 @@ class TomatoApp:
         self.root.resizable(False, False)
 
         self.selected_path_var = tk.StringVar(value="No file selected")
+        self.output_path_var = tk.StringVar(value="Output: (auto)")
         self.mode_var = tk.StringVar(value="void")
         self.count_var = tk.IntVar(value=1)
         self.length_var = tk.IntVar(value=1)
@@ -82,6 +83,7 @@ class TomatoApp:
         self._run_button: ttk.Button | None = None
 
         self._build_ui()
+        self.mode_var.trace_add("write", lambda *_: self._refresh_output_hint())
         self._update_run_state()
 
     def _build_ui(self) -> None:
@@ -110,6 +112,15 @@ class TomatoApp:
 
         ttk.Label(frame, textvariable=self.selected_path_var, wraplength=460).pack(pady=(0, 12))
 
+        export_frame = ttk.Frame(frame)
+        export_frame.pack(fill="x", pady=(0, 12))
+        ttk.Button(export_frame, text="Export To…", command=self._on_export_to).pack(
+            side="left"
+        )
+        ttk.Label(export_frame, textvariable=self.output_path_var, wraplength=360).pack(
+            side="left", padx=(8, 0), fill="x", expand=True
+        )
+
         controls = ttk.Frame(frame)
         controls.pack(fill="x")
 
@@ -124,38 +135,49 @@ class TomatoApp:
         mode_combo.grid(row=1, column=0, sticky="w")
 
         ttk.Label(controls, text="Glitch frequency").grid(row=0, column=1, padx=(12, 0), sticky="w")
-        ttk.Scale(
+        self.count_value_label = ttk.Label(controls, text=str(self.count_var.get()))
+        self.count_value_label.grid(row=0, column=2, padx=(8, 0), sticky="e")
+        self.count_scale = ttk.Scale(
             controls,
             from_=1,
             to=20,
             orient="horizontal",
             variable=self.count_var,
-            command=lambda _val: self.count_var.set(int(float(self.count_var.get()))),
-        ).grid(row=1, column=1, padx=(12, 0), sticky="we")
+            command=self._on_count_change,
+        )
+        self.count_scale.grid(row=1, column=1, columnspan=2, padx=(12, 0), sticky="we")
 
         ttk.Label(controls, text="Glitch length").grid(row=2, column=0, sticky="w", pady=(8, 0))
-        ttk.Scale(
+        self.length_value_label = ttk.Label(controls, text=str(self.length_var.get()))
+        self.length_value_label.grid(row=2, column=1, sticky="e", padx=(12, 0))
+        self.length_scale = ttk.Scale(
             controls,
             from_=1,
             to=20,
             orient="horizontal",
             variable=self.length_var,
-            command=lambda _val: self.length_var.set(int(float(self.length_var.get()))),
-        ).grid(row=3, column=0, sticky="we")
+            command=self._on_length_change,
+        )
+        self.length_scale.grid(row=3, column=0, columnspan=2, sticky="we")
 
         ttk.Label(controls, text="Aggressiveness").grid(
             row=2, column=1, padx=(12, 0), sticky="w", pady=(8, 0)
         )
-        ttk.Scale(
+        self.kill_value_label = ttk.Label(controls, text=f"{self.kill_var.get():.2f}")
+        self.kill_value_label.grid(row=2, column=2, padx=(8, 0), sticky="e")
+        self.kill_scale = ttk.Scale(
             controls,
             from_=0.3,
             to=1.0,
             orient="horizontal",
             variable=self.kill_var,
-        ).grid(row=3, column=1, padx=(12, 0), sticky="we")
+            command=self._on_kill_change,
+        )
+        self.kill_scale.grid(row=3, column=1, columnspan=2, padx=(12, 0), sticky="we")
 
         controls.columnconfigure(0, weight=1)
         controls.columnconfigure(1, weight=1)
+        controls.columnconfigure(2, weight=0)
 
         options = ttk.Frame(frame)
         options.pack(fill="x", pady=(12, 0))
@@ -170,14 +192,18 @@ class TomatoApp:
         self._run_button = ttk.Button(frame, text="Run Tomato", command=self._run)
         self._run_button.pack(pady=(16, 0))
 
+        self._set_slider_defaults()
+
     def _set_selected_path(self, path: Path) -> None:
         if path.suffix.lower() != ".avi":
             messagebox.showerror("Invalid file", "Please select an .avi file.")
             self.selected_path_var.set("No file selected")
+            self.output_path_var.set("Output: (auto)")
             self._update_run_state()
             return
 
-        self.selected_path_var.set(str(path))
+        self.selected_path_var.set(f"Input: {path}")
+        self.output_path_var.set(f"Output: {self._default_output_path(path)}")
         self._update_run_state()
 
     def _on_add_file(self) -> None:
@@ -194,14 +220,39 @@ class TomatoApp:
         if paths:
             self._set_selected_path(Path(paths[0]))
 
+    def _on_export_to(self) -> None:
+        input_path = Path(self.selected_path_var.get().replace("Input: ", ""))
+        if not input_path.exists():
+            messagebox.showerror("Missing file", "Please select an input .avi file first.")
+            return
+
+        suggested = self._default_output_path(input_path)
+        save_path = filedialog.asksaveasfilename(
+            title="Export Tomato output",
+            defaultextension=".avi",
+            initialfile=suggested.name,
+            initialdir=str(suggested.parent),
+            filetypes=[("AVI files", "*.avi")],
+        )
+        if save_path:
+            self.output_path_var.set(f"Output: {save_path}")
+
     def _update_run_state(self) -> None:
         if not self._run_button:
             return
 
-        path = Path(self.selected_path_var.get())
+        path = Path(self.selected_path_var.get().replace("Input: ", ""))
         enabled = path.exists() and path.suffix.lower() == ".avi"
         state = "normal" if enabled else "disabled"
         self._run_button.configure(state=state)
+
+    def _default_output_path(self, input_path: Path) -> Path:
+        return _compute_output_path(
+            input_path,
+            mode=self.mode_var.get(),
+            countframes=self.count_var.get(),
+            positframes=self.length_var.get(),
+        )
 
     def _build_args(self, input_path: Path) -> list[str]:
         args = [
@@ -223,11 +274,14 @@ class TomatoApp:
         return args
 
     def _run(self) -> None:
-        input_path = Path(self.selected_path_var.get())
+        input_path = Path(self.selected_path_var.get().replace("Input: ", ""))
         if not input_path.exists() or input_path.suffix.lower() != ".avi":
             messagebox.showerror("Invalid file", "Please select a valid .avi file.")
             self._update_run_state()
             return
+
+        export_path_text = self.output_path_var.get().replace("Output: ", "").strip()
+        export_path = Path(export_path_text) if export_path_text and export_path_text != "(auto)" else None
 
         args = self._build_args(input_path)
         try:
@@ -238,13 +292,50 @@ class TomatoApp:
             messagebox.showerror("Tomato failed", str(exc))
             return
 
-        output_path = _compute_output_path(
-            input_path,
-            mode=self.mode_var.get(),
-            countframes=self.count_var.get(),
-            positframes=self.length_var.get(),
-        )
+        output_path = self._default_output_path(input_path)
+        if export_path and export_path != output_path:
+            if output_path.exists():
+                output_path.replace(export_path)
+                output_path = export_path
+            else:
+                messagebox.showerror(
+                    "Tomato failed",
+                    "Tomato did not create the expected output file.",
+                )
+                return
+
         messagebox.showinfo("Tomato complete", f"Output saved to:\n{output_path}")
+
+    def _set_slider_defaults(self) -> None:
+        self.count_scale.set(self.count_var.get())
+        self.length_scale.set(self.length_var.get())
+        self.kill_scale.set(self.kill_var.get())
+        self._on_count_change(str(self.count_var.get()))
+        self._on_length_change(str(self.length_var.get()))
+        self._on_kill_change(str(self.kill_var.get()))
+
+    def _on_count_change(self, value: str) -> None:
+        count = max(1, int(float(value)))
+        self.count_var.set(count)
+        self.count_value_label.config(text=str(count))
+        self._refresh_output_hint()
+
+    def _on_length_change(self, value: str) -> None:
+        length = max(1, int(float(value)))
+        self.length_var.set(length)
+        self.length_value_label.config(text=str(length))
+        self._refresh_output_hint()
+
+    def _on_kill_change(self, value: str) -> None:
+        kill = float(value)
+        self.kill_var.set(kill)
+        self.kill_value_label.config(text=f"{kill:.2f}")
+
+    def _refresh_output_hint(self) -> None:
+        input_text = self.selected_path_var.get().replace("Input: ", "")
+        input_path = Path(input_text) if input_text and input_text != "No file selected" else None
+        if input_path and input_path.exists():
+            self.output_path_var.set(f"Output: {self._default_output_path(input_path)}")
 
     def run(self) -> None:
         self.root.mainloop()
