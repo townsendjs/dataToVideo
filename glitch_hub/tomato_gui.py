@@ -59,7 +59,12 @@ def _compute_output_path(file_path: Path, mode: str, countframes: int, positfram
 class TomatoApp:
     def __init__(self, parent: tk.Misc | None = None):
         _ensure_repo_on_path()
-        self.root = tk.Toplevel(parent) if parent else TkinterDnD.Tk()
+        if parent and DND_AVAILABLE:
+            self.root = TkinterDnD.Toplevel(parent)
+        elif parent:
+            self.root = tk.Toplevel(parent)
+        else:
+            self.root = TkinterDnD.Tk()
         self.root.title("Tomato – AVI Datamosh")
         self.root.geometry("520x420")
         self.root.resizable(False, False)
