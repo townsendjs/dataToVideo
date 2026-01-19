@@ -90,6 +90,7 @@ class TomatoApp:
         self.firstframe_var = tk.BooleanVar(value=True)
 
         self._run_button: ttk.Button | None = None
+        self.mode_combo: ttk.Combobox | None = None
 
         self._build_ui()
         self.mode_var.trace_add("write", lambda *_: self._refresh_output_hint())
@@ -134,14 +135,15 @@ class TomatoApp:
         controls.pack(fill="x")
 
         ttk.Label(controls, text="Mode").grid(row=0, column=0, sticky="w")
-        mode_combo = ttk.Combobox(
+        self.mode_combo = ttk.Combobox(
             controls,
             textvariable=self.mode_var,
             values=MODES,
             state="readonly",
             width=12,
         )
-        mode_combo.grid(row=1, column=0, sticky="w")
+        self.mode_combo.grid(row=1, column=0, sticky="w")
+        self.mode_combo.bind("<<ComboboxSelected>>", self._on_mode_change)
 
         ttk.Label(controls, text="Glitch frequency").grid(row=0, column=1, padx=(12, 0), sticky="w")
         self.count_value_label = ttk.Label(controls, text=str(self.freq_var.get()))
@@ -258,7 +260,7 @@ class TomatoApp:
     def _default_output_path(self, input_path: Path) -> Path:
         return _compute_output_path(
             input_path,
-            mode=self.mode_var.get(),
+            mode=self._current_mode(),
             countframes=self.freq_var.get(),
             positframes=self.length_var.get(),
             aggressiveness=self.agg_var.get(),
@@ -269,7 +271,7 @@ class TomatoApp:
             "-i",
             str(input_path),
             "-m",
-            self.mode_var.get(),
+            self._current_mode(),
             "-c",
             str(self.freq_var.get()),
             "-n",
@@ -356,6 +358,17 @@ class TomatoApp:
     def _format_agg_label(self) -> str:
         percent = int(round(self.agg_var.get() * 100))
         return f"{percent}%"
+
+    def _current_mode(self) -> str:
+        if self.mode_combo is not None:
+            selected = self.mode_combo.get()
+            if selected:
+                self.mode_var.set(selected)
+        return self.mode_var.get()
+
+    def _on_mode_change(self, _event: tk.Event) -> None:
+        self._current_mode()
+        self._refresh_output_hint()
 
     def _refresh_output_hint(self) -> None:
         input_text = self.selected_path_var.get().replace("Input: ", "")
