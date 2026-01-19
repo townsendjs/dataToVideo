@@ -232,9 +232,17 @@ def main(argv=None):
     print("> step 4/5 : putting things back together")
     
     #name new file
-    cname = '-c' + str(countframes) if int(countframes) > 1 else '' 
-    pname = '-n' + str(positframes) if int(positframes) > 1 else ''
-    fileout = filein[:-4] + '-' + mode + cname + pname + '.avi'
+    freq = int(countframes)
+    length = int(positframes)
+    agg_percent = int(round(float(kill) * 100))
+
+    if agg_percent < 0:
+    	agg_percent = 0
+    if agg_percent > 100:
+    	agg_percent = 100
+
+    base = filein[:-4]
+    fileout = f"{base}-{mode}-f{freq}-l{length}-a{agg_percent}.avi"
     
     #delete old file
     if os.path.exists(fileout):

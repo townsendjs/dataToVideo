@@ -49,10 +49,19 @@ def _parse_drop_paths(raw_path: str) -> list[str]:
     return paths
 
 
-def _compute_output_path(file_path: Path, mode: str, countframes: int, positframes: int) -> Path:
-    cname = f"-c{countframes}" if countframes > 1 else ""
-    pname = f"-n{positframes}" if positframes > 1 else ""
-    output_name = f"{file_path.stem}-{mode}{cname}{pname}.avi"
+def _compute_output_path(
+    file_path: Path,
+    mode: str,
+    countframes: int,
+    positframes: int,
+    aggressiveness: float,
+) -> Path:
+    agg_percent = int(round(aggressiveness * 100))
+    if agg_percent < 0:
+        agg_percent = 0
+    if agg_percent > 100:
+        agg_percent = 100
+    output_name = f"{file_path.stem}-{mode}-f{countframes}-l{positframes}-a{agg_percent}.avi"
     return file_path.with_name(output_name)
 
 
@@ -74,9 +83,9 @@ class TomatoApp:
         self.selected_path_var = tk.StringVar(value="No file selected")
         self.output_path_var = tk.StringVar(value="Output: (auto)")
         self.mode_var = tk.StringVar(value="void")
-        self.count_var = tk.IntVar(value=1)
-        self.length_var = tk.IntVar(value=1)
-        self.kill_var = tk.DoubleVar(value=0.7)
+        self.freq_var = tk.IntVar(value=4)
+        self.length_var = tk.IntVar(value=4)
+        self.agg_var = tk.DoubleVar(value=0.5)
         self.audio_var = tk.BooleanVar(value=False)
         self.firstframe_var = tk.BooleanVar(value=True)
 
@@ -135,14 +144,14 @@ class TomatoApp:
         mode_combo.grid(row=1, column=0, sticky="w")
 
         ttk.Label(controls, text="Glitch frequency").grid(row=0, column=1, padx=(12, 0), sticky="w")
-        self.count_value_label = ttk.Label(controls, text=str(self.count_var.get()))
+        self.count_value_label = ttk.Label(controls, text=str(self.freq_var.get()))
         self.count_value_label.grid(row=0, column=2, padx=(8, 0), sticky="e")
         self.count_scale = ttk.Scale(
             controls,
             from_=1,
-            to=20,
+            to=12,
             orient="horizontal",
-            variable=self.count_var,
+            variable=self.freq_var,
             command=self._on_count_change,
         )
         self.count_scale.grid(row=1, column=1, columnspan=2, padx=(12, 0), sticky="we")
@@ -153,7 +162,7 @@ class TomatoApp:
         self.length_scale = ttk.Scale(
             controls,
             from_=1,
-            to=20,
+            to=12,
             orient="horizontal",
             variable=self.length_var,
             command=self._on_length_change,
@@ -163,14 +172,14 @@ class TomatoApp:
         ttk.Label(controls, text="Aggressiveness").grid(
             row=4, column=0, sticky="w", pady=(8, 0)
         )
-        self.kill_value_label = ttk.Label(controls, text=f"{self.kill_var.get():.2f}")
+        self.kill_value_label = ttk.Label(controls, text=self._format_agg_label())
         self.kill_value_label.grid(row=4, column=2, padx=(8, 0), sticky="e")
         self.kill_scale = ttk.Scale(
             controls,
-            from_=0.3,
-            to=1.0,
+            from_=0.30,
+            to=1.00,
             orient="horizontal",
-            variable=self.kill_var,
+            variable=self.agg_var,
             command=self._on_kill_change,
         )
         self.kill_scale.grid(row=5, column=0, columnspan=3, sticky="we")
@@ -250,8 +259,9 @@ class TomatoApp:
         return _compute_output_path(
             input_path,
             mode=self.mode_var.get(),
-            countframes=self.count_var.get(),
+            countframes=self.freq_var.get(),
             positframes=self.length_var.get(),
+            aggressiveness=self.agg_var.get(),
         )
 
     def _build_args(self, input_path: Path) -> list[str]:
@@ -261,16 +271,18 @@ class TomatoApp:
             "-m",
             self.mode_var.get(),
             "-c",
-            str(self.count_var.get()),
+            str(self.freq_var.get()),
             "-n",
             str(self.length_var.get()),
             "-k",
-            f"{self.kill_var.get():.2f}",
-            "-a",
-            "1" if self.audio_var.get() else "0",
-            "-ff",
-            "1" if self.firstframe_var.get() else "0",
+            f"{self.agg_var.get():.2f}",
         ]
+        if self.audio_var.get():
+            args.extend(["-a", "1"])
+        if self.firstframe_var.get():
+            args.extend(["-ff", "1"])
+        else:
+            args.extend(["-ff", "0"])
         return args
 
     def _run(self) -> None:
@@ -284,6 +296,7 @@ class TomatoApp:
         export_path = Path(export_path_text) if export_path_text and export_path_text != "(auto)" else None
 
         args = self._build_args(input_path)
+        print("Tomato args:", args)
         try:
             from glitch_hub import tomato
 
@@ -307,29 +320,42 @@ class TomatoApp:
         messagebox.showinfo("Tomato complete", f"Output saved to:\n{output_path}")
 
     def _set_slider_defaults(self) -> None:
-        self.count_scale.set(self.count_var.get())
+        self.count_scale.set(self.freq_var.get())
         self.length_scale.set(self.length_var.get())
-        self.kill_scale.set(self.kill_var.get())
-        self._on_count_change(str(self.count_var.get()))
+        self.kill_scale.set(self.agg_var.get())
+        self._on_count_change(str(self.freq_var.get()))
         self._on_length_change(str(self.length_var.get()))
-        self._on_kill_change(str(self.kill_var.get()))
+        self._on_kill_change(str(self.agg_var.get()))
 
     def _on_count_change(self, value: str) -> None:
         count = max(1, int(float(value)))
-        self.count_var.set(count)
+        if count > 12:
+            count = 12
+        self.freq_var.set(count)
         self.count_value_label.config(text=str(count))
         self._refresh_output_hint()
 
     def _on_length_change(self, value: str) -> None:
         length = max(1, int(float(value)))
+        if length > 12:
+            length = 12
         self.length_var.set(length)
         self.length_value_label.config(text=str(length))
         self._refresh_output_hint()
 
     def _on_kill_change(self, value: str) -> None:
         kill = float(value)
-        self.kill_var.set(kill)
-        self.kill_value_label.config(text=f"{kill:.2f}")
+        if kill < 0.30:
+            kill = 0.30
+        if kill > 1.00:
+            kill = 1.00
+        self.agg_var.set(kill)
+        self.kill_value_label.config(text=self._format_agg_label())
+        self._refresh_output_hint()
+
+    def _format_agg_label(self) -> str:
+        percent = int(round(self.agg_var.get() * 100))
+        return f"{percent}%"
 
     def _refresh_output_hint(self) -> None:
         input_text = self.selected_path_var.get().replace("Input: ", "")
