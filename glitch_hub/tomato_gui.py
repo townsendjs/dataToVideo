@@ -68,7 +68,7 @@ class TomatoApp:
         else:
             self.root = TkinterDnD.Tk()
         self.root.title("Tomato – AVI Datamosh")
-        self.root.geometry("520x420")
+        self.root.geometry("520x480")
         self.root.resizable(False, False)
 
         self.selected_path_var = tk.StringVar(value="No file selected")
@@ -149,7 +149,7 @@ class TomatoApp:
 
         ttk.Label(controls, text="Glitch length").grid(row=2, column=0, sticky="w", pady=(8, 0))
         self.length_value_label = ttk.Label(controls, text=str(self.length_var.get()))
-        self.length_value_label.grid(row=2, column=0, sticky="e", padx=(0, 8))
+        self.length_value_label.grid(row=2, column=2, padx=(8, 0), sticky="e")
         self.length_scale = ttk.Scale(
             controls,
             from_=1,
@@ -158,13 +158,13 @@ class TomatoApp:
             variable=self.length_var,
             command=self._on_length_change,
         )
-        self.length_scale.grid(row=3, column=0, sticky="we")
+        self.length_scale.grid(row=3, column=0, columnspan=3, sticky="we")
 
         ttk.Label(controls, text="Aggressiveness").grid(
             row=4, column=0, sticky="w", pady=(8, 0)
         )
         self.kill_value_label = ttk.Label(controls, text=f"{self.kill_var.get():.2f}")
-        self.kill_value_label.grid(row=4, column=1, padx=(8, 0), sticky="e")
+        self.kill_value_label.grid(row=4, column=2, padx=(8, 0), sticky="e")
         self.kill_scale = ttk.Scale(
             controls,
             from_=0.3,
